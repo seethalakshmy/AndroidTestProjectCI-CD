@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.design.mycicdapplication",
+  "applicationId": "com.cicd.seeroo_sample",
   "variantName": "release",
   "elements": [
     {

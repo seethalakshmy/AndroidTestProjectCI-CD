@@ -4,17 +4,23 @@ plugins {
 }
 
 android {
-    namespace = "com.design.mycicdapplication"
+    namespace = "com.cicd.seeroo_sample"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.design.mycicdapplication"
+        applicationId = "com.cicd.seeroo_sample"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+
+        // --- Version Code from GitHub Actions ---
+        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull()
+        val finalVersionCode = ciVersionCode ?: 1
+        versionCode = finalVersionCode
+
+        // --- Version Name Auto Generate ---
+        versionName = "1.0.$finalVersionCode"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
