@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,6 +25,35 @@ android {
         versionName = "1.0.$finalVersionCode"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val envStoreFile = System.getenv("KEYSTORE_PATH")
+            val envStorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val envKeyAlias = System.getenv("KEY_ALIAS")
+            val envKeyPassword = System.getenv("KEY_PASSWORD")
+
+            if (!envStoreFile.isNullOrEmpty()) {
+                // CI (GitHub Actions)
+                storeFile = file(envStoreFile)
+                storePassword = envStorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
+            } else {
+                // Running locally
+                val props = Properties()
+                val propsFile = rootProject.file("key.properties")
+
+                if (propsFile.exists()) {
+                    props.load(propsFile.inputStream())
+                    storeFile = file(props["storeFile"] as String)
+                    storePassword = props["storePassword"] as String
+                    keyAlias = props["keyAlias"] as String
+                    keyPassword = props["keyPassword"] as String
+                }
+            }
+        }
     }
 
     buildTypes {
