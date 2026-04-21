@@ -62,18 +62,18 @@ jobs:
         run: |
           # Try to base64 decode, if it's invalid base64 or results in invalid JSON, fall back to plain text
           if echo "$PLAY_STORE_JSON" | base64 --decode > play-store-key.json 2>/dev/null && jq -e . play-store-key.json >/dev/null 2>&1; then
-            echo "✅ Decoded PLAYSTORE_JSONfrom base64 successfully."
+            echo "Decoded PLAYSTORE_JSONfrom base64 successfully."
           else
-            echo "⚠️ PLAYSTORE_JSONis not valid base64. Treating as plain text JSON."
+            echo "PLAYSTORE_JSONis not valid base64. Treating as plain text JSON."
             echo "$PLAY_STORE_JSON" | tr -d '\000' | sed 's/\r$//' > play-store-key.json
           fi
 
           echo "Validating play-store-key.json..."
           if ! jq -e . play-store-key.json >/dev/null 2>&1; then
-            echo "❌ JSON is invalid or empty! Please verify your GitHub secret: PLAY_STORE_JSON_KEY."
+            echo "JSON is invalid or empty! Please verify your GitHub secret: PLAY_STORE_JSON_KEY."
             exit 1
           fi
-          echo "✅ JSON is valid and ready."
+          echo "JSON is valid and ready."
 
       # ----------------------------------------------
       # Gradle Setup
