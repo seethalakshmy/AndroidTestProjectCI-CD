@@ -1,0 +1,154 @@
+name: Firebase App Distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Build Type"
+        required: true
+        default: "debug"
+        type: choice
+        options:
+          - debug
+          - release
+          - production
+      version_code:
+        description: "App Version Code"
+        required: true
+        default: "1"
+      release_notes:
+        description: "Release notes for testers"
+        required: false
+        default: "New build available for testing."
+      tester_groups:
+        description: "Tester group alias (comma-separated)"
+        required: false
+        default: "qa-team"
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------------
+      # Checkout Code
+      # ----------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------
+      # Java & Android SDK
+      # ----------------------------------------------
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install SDK components
+        run: |
+          sdkmanager --update
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-36"
+          sdkmanager "build-tools;36.0.0"
+
+      # ----------------------------------------------
+      # Resolve Build Variables based on Build Type
+      # debug     → assembleDebug   → FIREBASE_APP_ID_DEBUG
+      # release   → assembleRelease → FIREBASE_APP_ID_RELEASE
+      # production→ assembleRelease → FIREBASE_APP_ID_PROD
+      # ----------------------------------------------
+      - name: Set Build Variables
+        run: |
+          BUILD_TYPE="${{ github.event.inputs.build_type }}"
+
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            echo "GRADLE_TASK=assembleDebug"                                         >> $GITHUB_ENV
+            echo "APK_PATH=app/build/outputs/apk/debug/app-debug.apk"               >> $GITHUB_ENV
+            echo "APK_DIR=app/build/outputs/apk/debug/"                             >> $GITHUB_ENV
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID_DEBUG }}"             >> $GITHUB_ENV
+            echo "TESTER_GROUPS=${{ github.event.inputs.tester_groups }}"           >> $GITHUB_ENV
+
+          elif [ "$BUILD_TYPE" = "production" ]; then
+            echo "GRADLE_TASK=assembleRelease"                                       >> $GITHUB_ENV
+            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk"           >> $GITHUB_ENV
+            echo "APK_DIR=app/build/outputs/apk/release/"                           >> $GITHUB_ENV
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID_PROD }}"              >> $GITHUB_ENV
+            echo "TESTER_GROUPS=${{ github.event.inputs.tester_groups }}"           >> $GITHUB_ENV
+
+          else
+            # release (staging/qa)
+            echo "GRADLE_TASK=assembleRelease"                                       >> $GITHUB_ENV
+            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk"           >> $GITHUB_ENV
+            echo "APK_DIR=app/build/outputs/apk/release/"                           >> $GITHUB_ENV
+            echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID_RELEASE }}"           >> $GITHUB_ENV
+            echo "TESTER_GROUPS=${{ github.event.inputs.tester_groups }}"           >> $GITHUB_ENV
+          fi
+
+      # ----------------------------------------------
+      # Decode Keystore (only needed for release/production)
+      # ----------------------------------------------
+      - name: Decode Keystore
+        if: github.event.inputs.build_type != 'debug'
+        run: |
+          mkdir -p app/keystores
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystores/cicd-keystore.jks
+
+      # ----------------------------------------------
+      # Gradle Setup
+      # ----------------------------------------------
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # ----------------------------------------------
+      # Clean
+      # ----------------------------------------------
+      - name: Clean
+        run: ./gradlew clean --stacktrace
+        env:
+          KEYSTORE_PATH: keystores/cicd-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # ----------------------------------------------
+      # Build APK (Debug or Release based on build_type)
+      # ----------------------------------------------
+      - name: Build APK (${{ github.event.inputs.build_type }})
+        run: ./gradlew ${{ env.GRADLE_TASK }} --stacktrace
+        env:
+          KEYSTORE_PATH: keystores/cicd-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.event.inputs.version_code }}
+
+      # ----------------------------------------------
+      # Verify APK Output
+      # ----------------------------------------------
+      - name: Verify APK exists
+        run: |
+          echo "Build Type: ${{ github.event.inputs.build_type }}"
+          echo "Generated APK files:"
+          ls -R ${{ env.APK_DIR }}
+
+      # ----------------------------------------------
+      # Upload to Firebase App Distribution
+      # ----------------------------------------------
+      - name: Upload to Firebase App Distribution (${{ github.event.inputs.build_type }})
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ env.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: ${{ env.TESTER_GROUPS }}
+          releaseNotes: "[${{ github.event.inputs.build_type }}] ${{ github.event.inputs.release_notes }} | Version: 1.0.${{ github.event.inputs.version_code }}"
+          file: ${{ env.APK_PATH }}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "405713798760",
+    "project_id": "gitactionsample",
+    "storage_bucket": "gitactionsample.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:405713798760:android:f7abba6f7f6e4d07779ddd",
+        "android_client_info": {
+          "package_name": "com.cicd.seeroo_sample"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBX76P8AapKzZXp5PUvPYhO7J_J-uf0wMQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
